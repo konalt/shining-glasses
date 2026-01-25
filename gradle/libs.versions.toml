@@ -1,0 +1,38 @@
+[versions]
+agp = "9.0.0"
+colorpickerview = "2.4.0"
+composeBom = "2026.01.00"
+fastjson = "2.0.60"
+fastjson2 = "2.0.60"
+gson = "2.13.2"
+httpmime = "4.5.14"
+junit = "4.13.2"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+appcompat = "1.7.1"
+material = "1.13.0"
+activity = "1.12.2"
+constraintlayout = "2.2.1"
+multidex = "2.0.1"
+volley = "1.2.1"
+
+[libraries]
+colorpickerview = { module = "com.github.skydoves:colorpickerview", version.ref = "colorpickerview" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+fastjson2 = { module = "com.alibaba.fastjson2:fastjson2", version.ref = "fastjson2" }
+fastjson = { module = "com.alibaba:fastjson", version.ref = "fastjson" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+httpmime = { module = "org.apache.httpcomponents:httpmime", version.ref = "httpmime" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+multidex = { module = "androidx.multidex:multidex", version.ref = "multidex" }
+volley = { module = "com.android.volley:volley", version.ref = "volley" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+

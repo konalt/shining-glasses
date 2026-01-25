@@ -1,0 +1,7 @@
+<resources>
+    <style name="Base.Theme.NGlasses" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:fitsSystemWindows">true</item>
+    </style>
+
+    <style name="Theme.NGlasses" parent="Base.Theme.NGlasses" />
+</resources>
