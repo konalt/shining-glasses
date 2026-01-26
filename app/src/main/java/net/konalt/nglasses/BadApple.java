@@ -14,9 +14,9 @@ import java.util.List;
 import java.util.Objects;
 
 public class BadApple {
-    private static final int FPS = 4;
+    private static final int FPS = 12;
     private static final long FRAMETIME = 1000 / FPS;
-    private static final long SETPX_WAIT = 15;
+    private static final long SETPX_WAIT = 12;
     private static final Handler handler = new Handler(Looper.getMainLooper());
     private static boolean play = false;
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

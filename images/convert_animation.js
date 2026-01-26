@@ -1,5 +1,6 @@
 const { createCanvas, loadImage } = require("canvas");
 const fs = require("fs");
+const cp = require("child_process");
 
 const filename = process.argv[2];
 
@@ -15,7 +16,7 @@ async function run(i, kf = false) {
     const outPixelsOn = [];
     const outPixelsOff = [];
 
-    const image = await loadImage("badapple/f" + i + ".png");
+    const image = await loadImage(id + "/f" + i + ".png");
     const c = createCanvas(36, 12);
     const ctx = c.getContext("2d");
     ctx.drawImage(image, 36 / 2 - image.width / 2, 0, image.width, 12);
@@ -61,17 +62,42 @@ async function run(i, kf = false) {
 
     const outText = `"${ifPixelsOn.map((p) => p.join(",")).join(" ")}|${ifPixelsOff.map((p) => p.join(",")).join(" ")}",`;
 
-    fs.appendFileSync(`a_badapple.txt`, outText + "\n");
+    fs.appendFileSync(id + `.txt`, outText + "\n");
 }
 
 async function run2(c) {
-    fs.writeFileSync("a_badapple.txt", "");
+    fs.writeFileSync(id + ".txt", "");
     for (let i = 1; i <= c; i++) {
         let kf = i % keyframeInterval == 0;
         await run(i.toString().padStart(4, "0"), kf);
     }
 }
 
-run2(874).then(() => {
-    console.log("Done");
+const id = Math.floor(Math.random() * 65536).toString(16);
+
+fs.mkdirSync(id);
+
+/**
+ * @type {cp.ChildProcessWithoutNullStreams}
+ */
+const proc = cp.spawn(
+    "ffmpeg",
+    `-i ${filename} -vf scale=-2:12:flags=neighbor -r 10 ${id}/f%04d.png`.split(
+        " ",
+    ),
+);
+
+proc.stderr.on("data", (c) => {
+    process.stdout.write(c);
+});
+
+proc.on("close", (c) => {
+    if (c == 0) {
+        const fc = fs.readdirSync(id).length;
+        run2(fc).then(() => {
+            console.log("cleaning up");
+            fs.rmSync(id, { recursive: true, force: true });
+            console.log("Done");
+        });
+    }
 });

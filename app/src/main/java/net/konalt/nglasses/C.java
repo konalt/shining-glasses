@@ -62,7 +62,8 @@ public class C {
             "Dead",
             "Murder",
             "Woozy",
-            "Expressionless"
+            "Expressionless",
+            "Tired"
     };
     public static final String[] eyeTypes = new String[]{
             CustomImages.EYES_NORMAL,
@@ -71,7 +72,8 @@ public class C {
             CustomImages.EYES_DEAD,
             CustomImages.EYES_MURDER,
             CustomImages.EYES_WOOZY,
-            CustomImages.EYES_EXPRESSIONLESS
+            CustomImages.EYES_EXPRESSIONLESS,
+            CustomImages.EYES_TIRED
     };
     public static final int WIDTH = 36;
     public static final int HEIGHT = 12;
