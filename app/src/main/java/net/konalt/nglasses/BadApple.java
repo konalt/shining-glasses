@@ -14,11 +14,14 @@ import java.util.List;
 import java.util.Objects;
 
 public class BadApple {
-    private static final int FPS = 12;
+    private static final int FPS = 10;
     private static final long FRAMETIME = 1000 / FPS;
-    private static final long SETPX_WAIT = 12;
+    private static final long SETPX_WAIT = 13;
     private static final Handler handler = new Handler(Looper.getMainLooper());
     private static boolean play = false;
+    private static boolean isDrawingFrame = false;
+    private static final List<int[]> cachedOn = new ArrayList<>();
+    private static final List<int[]> cachedOff = new ArrayList<>();
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private static void setPixels(List<int[]> pixels, int color) {
         if (pixels.isEmpty()) {
@@ -62,31 +65,64 @@ public class BadApple {
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private static void sendFrame(List<int[]> on, List<int[]> off) {
+        if (isDrawingFrame) {
+            Log.d(C.TAG, "Frame not finished, caching pixels");
+            for (int[] px : on) {
+                if (cachedOn.stream().noneMatch(p -> p[0] == px[0] && p[1] == px[1])) {
+                    cachedOn.add(px);
+                }
+            }
+            for (int[] px : off) {
+                if (cachedOff.stream().noneMatch(p -> p[0] == px[0] && p[1] == px[1])) {
+                    cachedOff.add(px);
+                }
+            }
+            return;
+        } else {
+            isDrawingFrame = true;
+        }
         Log.d(C.TAG, "Sending frame");
-        if (on.isEmpty()) {
-            if (!off.isEmpty()) {
-                sendPixelPacket(off, 0, 0x0, () -> {
+        List<int[]> finalOn = new ArrayList<>(cachedOn);
+        for (int[] px : on) {
+            if (finalOn.stream().noneMatch(p -> p[0] == px[0] && p[1] == px[1])) {
+                finalOn.add(px);
+            }
+        }
+        cachedOn.clear();
+        List<int[]> finalOff = new ArrayList<>(cachedOff);
+        for (int[] px : off) {
+            if (finalOff.stream().noneMatch(p -> p[0] == px[0] && p[1] == px[1])) {
+                finalOff.add(px);
+            }
+        }
+        cachedOff.clear();
+        if (finalOn.isEmpty()) {
+            if (!finalOff.isEmpty()) {
+                sendPixelPacket(finalOff, 0, 0x0, () -> {
+                    isDrawingFrame = false;
                     Log.d(C.TAG, "Finished drawing frame, off only");
                 });
             } else {
+                isDrawingFrame = false;
                 Log.d(C.TAG, "empty frame :3");
             }
         } else {
-            if (!off.isEmpty()) {
-                sendPixelPacket(on, 0, 0xffffff, () -> {
+            if (!finalOff.isEmpty()) {
+                sendPixelPacket(finalOn, 0, 0xffffff, () -> {
                     handler.postDelayed(() -> {
-                        sendPixelPacket(off, 0, 0x0, () -> {
+                        sendPixelPacket(finalOff, 0, 0x0, () -> {
+                            isDrawingFrame = false;
                             Log.d(C.TAG, "Finished drawing frame, on and off");
                         });
                     }, SETPX_WAIT);
                 });
             } else {
-                sendPixelPacket(on, 0, 0xffffff, () -> {
+                sendPixelPacket(finalOn, 0, 0xffffff, () -> {
+                    isDrawingFrame = false;
                     Log.d(C.TAG, "Finished drawing frame, on only");
                 });
             }
         }
-
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private static void animate(List<List<List<int[]>>> animation, int index, boolean loop) {
