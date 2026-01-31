@@ -4,7 +4,7 @@ const cp = require("child_process");
 
 const filename = process.argv[2];
 
-const keyframeInterval = 9999;
+const keyframeInterval = 70;
 
 let lastOutPixelsOn = [];
 let lastOutPixelsOff = [];
