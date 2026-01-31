@@ -60,20 +60,28 @@ public class C {
             "Happy",
             "Scared",
             "Dead",
-            "Murder",
             "Woozy",
             "Expressionless",
-            "Tired"
+            "Tired",
+            "Excited",
+            "Squirm",
+            "Squint",
+            "Heart",
+            "Murder",
     };
     public static final String[] eyeTypes = new String[]{
             CustomImages.EYES_NORMAL,
             CustomImages.EYES_HAPPY,
             CustomImages.EYES_SCARED,
             CustomImages.EYES_DEAD,
-            CustomImages.EYES_MURDER,
             CustomImages.EYES_WOOZY,
             CustomImages.EYES_EXPRESSIONLESS,
-            CustomImages.EYES_TIRED
+            CustomImages.EYES_TIRED,
+            CustomImages.EYES_EXCITED,
+            CustomImages.EYES_SQUIRM,
+            CustomImages.EYES_NARROW,
+            CustomImages.EYES_HEART,
+            CustomImages.EYES_MURDER
     };
     public static final int WIDTH = 36;
     public static final int HEIGHT = 12;
