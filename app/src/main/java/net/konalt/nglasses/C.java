@@ -86,4 +86,5 @@ public class C {
     public static final int WIDTH = 36;
     public static final int HEIGHT = 12;
     public static final String TAG = "BLE";
+    public static final long BLINK_INTERVAL = 10 * 1000;
 }

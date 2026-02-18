@@ -284,12 +284,33 @@
                     android:text="RGB" />
             </LinearLayout>
 
-            <Button
-                android:id="@+id/btnEyesBlink"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:backgroundTint="#D5D5D5"
-                android:text="Blink" />
+                android:layout_height="match_parent"
+                android:layout_weight="4"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnEyesBlink"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="3"
+                    android:backgroundTint="#D5D5D5"
+                    android:text="Blink" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.1" />
+
+                <Button
+                    android:id="@+id/btnEyesBlinkStateToggle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:backgroundTint="#79E974"
+                    android:text="Start" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

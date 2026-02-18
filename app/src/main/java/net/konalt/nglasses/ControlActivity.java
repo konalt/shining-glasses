@@ -1,7 +1,10 @@
 package net.konalt.nglasses;
 
 import android.Manifest;
+import android.content.res.Resources;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -12,6 +15,7 @@ import android.widget.TextView;
 
 import androidx.annotation.RequiresPermission;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.slider.Slider;
 
@@ -29,6 +33,7 @@ public class ControlActivity extends AppCompatActivity {
     Button btnEyesInitPink;
     Button btnEyesInitRainbow;
     Button btnEyesBlink;
+    Button btnEyesBlinkStateToggle;
     Button btnEyesBlushEnable;
     Button btnEyesBlushDisable;
     Button btnBadAppleStart;
@@ -40,6 +45,13 @@ public class ControlActivity extends AppCompatActivity {
     Spinner customImageSpinner;
     Button btnSubmitCustomImage;
     Spinner eyeTypeSpinner;
+
+    private boolean isPeriodicBlinkingEnabled = false;
+
+    private final String BTN_GREEN = "#79E974";
+    private final String BTN_RED = "#FF9C9C";
+
+    private Handler handler = new Handler(Looper.getMainLooper());
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
@@ -73,6 +85,7 @@ public class ControlActivity extends AppCompatActivity {
         btnEyesInitPink = findViewById(R.id.btnEyesInitPink);
         btnEyesInitRainbow = findViewById(R.id.btnEyesInitRainbow);
         btnEyesBlink = findViewById(R.id.btnEyesBlink);
+        btnEyesBlinkStateToggle = findViewById(R.id.btnEyesBlinkStateToggle);
         btnEyesBlushEnable = findViewById(R.id.btnEyesBlushEnable);
         btnEyesBlushDisable = findViewById(R.id.btnEyesBlushDisable);
         btnBadAppleStart = findViewById(R.id.btnBadAppleStart);
@@ -103,26 +116,56 @@ public class ControlActivity extends AppCompatActivity {
         });
     }
 
+    private void setPeriodicBlinkingEnabled(boolean set) {
+        isPeriodicBlinkingEnabled = set;
+        if (isPeriodicBlinkingEnabled) {
+            btnEyesBlinkStateToggle.setText("Stop");
+            btnEyesBlinkStateToggle.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.button_red));
+        } else {
+            btnEyesBlinkStateToggle.setText("Start");
+            btnEyesBlinkStateToggle.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.button_green));
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private void intervalBlink() {
+        if (!isPeriodicBlinkingEnabled) return;
+        CustomImage.blink(getSelectedEyeImage(), CustomImage.currentColor);
+        handler.postDelayed(this::intervalBlink, C.BLINK_INTERVAL);
+    }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void initClickEvents() {
-        btnClear.setOnClickListener(v -> device.clear());
+        btnClear.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
+            device.clear();
+        });
         btnEyesInitN.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             CustomImage.init(getSelectedEyeImage(), CustomImages.N_EYES_COLOR, true);
         });
         btnEyesInitUzi.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             CustomImage.init(getSelectedEyeImage(), CustomImages.UZI_COLOR, true);
         });
         btnEyesInitWorker.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             CustomImage.init(getSelectedEyeImage(), CustomImages.WORKER_COLOR, true);
         });
         btnEyesInitPink.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             CustomImage.init(getSelectedEyeImage(), CustomImages.RED_COLOR, true);
         });
         btnEyesInitRainbow.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             CustomImage.initRainbow(getSelectedEyeImage(), true);
         });
         btnEyesBlink.setOnClickListener(v -> {
             CustomImage.blink(getSelectedEyeImage(), CustomImage.currentColor);
+        });
+        btnEyesBlinkStateToggle.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(!isPeriodicBlinkingEnabled);
+            intervalBlink();
         });
         btnEyesBlushEnable.setOnClickListener(v -> {
             CustomImage.init(CustomImages.BLUSH, CustomImage.currentColor, false);
@@ -131,19 +174,24 @@ public class ControlActivity extends AppCompatActivity {
             CustomImage.init(CustomImages.BLUSH, 0x0, false);
         });
         btnBadAppleStart.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             List<List<List<int[]>>> animation = BadApple.parseAnimationData(Animations.BAD_APPLE);
             BadApple.playAnimation(animation, false);
         });
         btnBadAppleStop.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             BadApple.stopAnimation();
         });
         btnSubmitImage.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             device.setImage(imageSpinner.getSelectedItemPosition());
         });
         btnSubmitAnimation.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             device.setAnimation(animationSpinner.getSelectedItemPosition());
         });
         btnSubmitCustomImage.setOnClickListener(v -> {
+            setPeriodicBlinkingEnabled(false);
             CustomImage.initPaletteImage(C.paletteImages[customImageSpinner.getSelectedItemPosition()], true);
         });
     }
