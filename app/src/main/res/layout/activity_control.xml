@@ -58,7 +58,7 @@
                     android:fontFamily="monospace"
                     android:gravity="center"
                     android:text="Brightness"
-                    android:textAlignment="textStart"
+                    android:textAlignment="viewStart"
                     android:textSize="20sp" />
 
                 <com.google.android.material.slider.Slider
