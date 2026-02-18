@@ -1,5 +1,5 @@
 # N Glasses
-**Partially reverse-engineered API for LED glasses**
+## Partially reverse-engineered API for LED glasses
 I got [these](https://www.amazon.ie/Luobannm-Luminous-Bluetooth-Programmable-Halloween/dp/B0FVLL9H5X) LED glasses from Amazon, but I was severely disappointed that the app was constantly recording the microphone, was proprietary, and needed file permissions, despite me never using these features. Through the magic of JADX and Android Studio I kind of reverse-engineered them.
 
 I was surprised nobody on the internet had already attempted this (at least not with these specific glasses, and at least not that I've found) so I hope this repo can assist any others in their journey. [xkcd/979](https://xkcd.com/979/) comes to mind. If anybody comes across this and finds it useful, I'd appreciate a star or something. I don't know. I'm tired.
