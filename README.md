@@ -22,9 +22,9 @@ If anybody has further reverse-engineered the DIY image protocol, please enlight
 
 Some helper JS scripts (`convert_img.js`, `convert_img_palette.js` and `convert_animation.js`) are also provided for converting images and animations into strings for the app.
 
-I think the helper scripts require `node-canvas`. And animations first need to be processed into 36-pixel-high frames by `ffmpeg`. I honestly don't remember. Make an issue if you need anything.
+I think the helper scripts require `node-canvas`. And animations first need to be processed into 12-pixel-high frames by `ffmpeg`. I honestly don't remember. Make an issue if you need anything.
 
-_Disclaimer: I am not an Android developer. This is my first, and currently only Android app. This was made in like 5 days. The code is spaghetti-like, ugly and awful, but it works. It has also only currently been tested on a Samsung A54._
+_Disclaimer: I am not an Android developer. This is my first, and currently only Android app. I have never seen a "bluetooth" before. This was made in like 5 days. The code is spaghetti-like, ugly and awful, but it works. It has also only currently been tested on a Samsung A54._
 
 Most of the key protocol-related information can be found in these files:
 - `RawGlassesDevice.java`
