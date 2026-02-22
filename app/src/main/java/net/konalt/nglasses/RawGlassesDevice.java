@@ -9,6 +9,8 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -16,6 +18,7 @@ import androidx.annotation.RequiresPermission;
 
 import com.alibaba.fastjson2.JSONB;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -31,9 +34,20 @@ public class RawGlassesDevice {
     private BluetoothGattCharacteristic mWriteCharacteristic2;
     private BluetoothGattCharacteristic mWriteCharacteristic3;
     private BluetoothGattCharacteristic mWriteCharacteristic4;
+    private BluetoothGattDescriptor descriptor;
+
+    private int notifyIndex = 0;
+
+    private BluetoothGattCharacteristic ctrlChar;
+    private BluetoothGattDescriptor ctrlDescriptor;
+    private BluetoothGattCharacteristic dataChar;
 
     private Runnable wc1Runnable;
     private Runnable wc3Runnable;
+
+    private Handler handler = new Handler(Looper.getMainLooper());
+
+    public boolean connected = false;
 
     public RawGlassesDevice(Context context, BluetoothDevice bt) {
         this.context = context;
@@ -47,7 +61,8 @@ public class RawGlassesDevice {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void connect(Runnable onConnect) {
         this.connectRunnable = onConnect;
-        gatt = device.connectGatt(this.context, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
+        gatt = device.connectGatt(this.context, false, gattCallback);
+        gatt.requestConnectionPriority(1);
     }
 
     public void onDisconnect(Runnable onDisconnect) {
@@ -67,7 +82,10 @@ public class RawGlassesDevice {
             return;
         }
         bluetoothGattCharacteristic.setValue(bArr);
-        this.gatt.writeCharacteristic(this.mWriteCharacteristic1);
+        boolean zWriteCharacteristic = this.gatt.writeCharacteristic(this.mWriteCharacteristic1);
+        String str = C.TAG;
+        Log.d(str, " -- write data: " + new String(Enigma.getDecodeData(bArr)));
+        Log.d(str, " -- write result:" + zWriteCharacteristic);
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void writeRawDataC2(byte[] bArr) {
@@ -105,6 +123,7 @@ public class RawGlassesDevice {
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.d("BLE", "Disconnected from GATT server");
+                connected = false;
                 disconnectRunnable.run();
                 disconnectRunnable = () -> {};
             }
@@ -115,6 +134,7 @@ public class RawGlassesDevice {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                notifyIndex = 0;
                 List<BluetoothGattService> services = gatt.getServices();
                 for (BluetoothGattService service : services) {
                     Log.d(C.TAG, "-----------");
@@ -123,9 +143,10 @@ public class RawGlassesDevice {
                         for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
                             UUID uuid = characteristic.getUuid();
                             Log.i(C.TAG, "Characteristic UUID: " + uuid);
-                            Log.i(C.TAG, "Value: " + Arrays.toString(characteristic.getValue()));
                             if (UUIDS.UUID_CHARACTERISTIC_WRITE1.equals(uuid)) {
                                 mWriteCharacteristic1 = characteristic;
+                                descriptor = characteristic.getDescriptors().get(0);
+                                Log.d(C.TAG, "========" + descriptor);
                             }
                             if (UUIDS.UUID_CHARACTERISTIC_WRITE2.equals(uuid)) {
                                 mWriteCharacteristic2 = characteristic;
@@ -135,45 +156,72 @@ public class RawGlassesDevice {
                             }
                             if (UUIDS.UUID_CHARACTERISTIC_WRITE4.equals(uuid)) {
                                 mWriteCharacteristic4 = characteristic;
-                                BluetoothGattDescriptor desc = characteristic.getDescriptors().get(0);
-                                desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                                gatt.writeDescriptor(desc);
                             }
                         }
                     } else {
-                        Log.d(C.TAG, "Other service found: " + service.getUuid());
-                        for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                            UUID uuid = characteristic.getUuid();
-                            Log.d(C.TAG, "Characteristic UUID: " + uuid);
+                        if (UUIDS.UUID_OTA_SERVICE.equals(service.getUuid())) {
+                            Log.i(C.TAG, "OTA service found: " + service.getUuid());
+                            for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
+                                UUID uuid = characteristic.getUuid();
+                                Log.d(C.TAG, "OTA Characteristic UUID: " + uuid);
+                                if (UUIDS.UUID_OTA_CHARACTERISTIC_CTRL.equals(uuid)) {
+                                    ctrlChar = characteristic;
+                                    ctrlDescriptor = characteristic.getDescriptor(UUIDS.UUID_OTA_DESCRIPTOR);
+                                    Log.d(C.TAG, "Found OTA ctrl char and ctrl descriptor");
+                                } else if (UUIDS.UUID_OTA_CHARACTERISTIC_DATA.equals(uuid)) {
+                                    dataChar = characteristic;
+                                    Log.d(C.TAG, "Found OTA data characteristic");
+                                }
+                            }
+                        } else {
+                            Log.d(C.TAG, "Other service found: " + service.getUuid());
+                            for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
+                                UUID uuid = characteristic.getUuid();
+                                Log.d(C.TAG, "Characteristic UUID: " + uuid);
+                            }
                         }
                     }
                 }
                 Log.d(C.TAG, "-----------");
-                connectRunnable.run();
-                connectRunnable = () -> {};
+                handler.postDelayed(() -> {
+                    gatt.setCharacteristicNotification(mWriteCharacteristic4, true);
+                    BluetoothGattDescriptor desc = mWriteCharacteristic4.getDescriptor(UUIDS.UUID_DESCRIPTOR);
+                    if (descriptor != null) {
+                        desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                        gatt.writeDescriptor(desc);
+                        setMtuSize(100);
+                    }
+                }, 500L);
             }
         }
 
         @Override
         public void onCharacteristicChanged(
                 BluetoothGatt gatt,
-                BluetoothGattCharacteristic characteristic
+                BluetoothGattCharacteristic characteristic,
+                byte[] value
         ) {
             super.onCharacteristicChanged(gatt, characteristic);
-            byte[] data = characteristic.getValue();
-            Log.d("BLE", "Received: " + Arrays.toString(data));
+            Log.d("BLE", "Received: " + Arrays.toString(value));
         }
 
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
             super.onMtuChanged(gatt, mtu, status);
             Log.d("BLE", "MTU changed to " + mtu);
+
+            gatt.setCharacteristicNotification(ctrlChar, true);
+            if (ctrlDescriptor != null) {
+                ctrlDescriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                gatt.writeDescriptor(ctrlDescriptor);
+            }
         }
 
         @Override
         public void onCharacteristicRead(@NonNull BluetoothGatt gatt, @NonNull BluetoothGattCharacteristic characteristic, @NonNull byte[] value, int status) {
             super.onCharacteristicRead(gatt, characteristic, value, status);
-            Log.d("BLE", "Read characteristic " + characteristic + ", " + Arrays.toString(value) + ", " + status);
+            Log.e("BLE", "Read characteristic " + characteristic + ", " + Arrays.toString(value) + ", " + status);
         }
 
         @Override
@@ -199,6 +247,29 @@ public class RawGlassesDevice {
         public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
             super.onPhyUpdate(gatt, txPhy, rxPhy, status);
             Log.d(C.TAG, "Phy Update: " + txPhy + " " + rxPhy);
+        }
+
+        @Override
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            Log.i(C.TAG, "onDescriptorWrite " + status);
+            super.onDescriptorWrite(gatt, descriptor, status);
+            if (status == 0) {
+                if (ctrlDescriptor.equals(descriptor)) {
+                    Log.d(C.TAG, "ctrlDescriptor written");
+                } else {
+                    Log.d(C.TAG, "ARE YOU READY TO RUMBLE?");
+                    // READY!!!!
+                    connected = true;
+                    connectRunnable.run();
+                    connectRunnable = () -> {};
+                }
+            }
+        }
+
+        @Override
+        public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int i, byte[] value) {
+            String str = new String(value);
+            Log.i(C.TAG, "Read descriptor: " + descriptor.getUuid().toString() + ", val: " + str);
         }
 
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

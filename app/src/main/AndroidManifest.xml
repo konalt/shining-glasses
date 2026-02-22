@@ -28,9 +28,10 @@
         <activity
             android:name=".ControlActivity"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-            </intent-filter>
+        </activity>
+        <activity
+            android:name=".EyesActivity"
+            android:exported="true">
         </activity>
     </application>
 

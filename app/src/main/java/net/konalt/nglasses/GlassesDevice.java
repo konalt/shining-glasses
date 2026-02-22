@@ -19,9 +19,9 @@ public class GlassesDevice {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void clear() {
-        byte[] light = Enigma.getClearCommand();
+        byte[] clear = Enigma.getClearCommand();
         Log.d(C.TAG, "Clearing");
-        raw.writeRawData(Enigma.getEncryptData(light));
+        raw.writeRawData(Enigma.getEncryptData(clear));
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -36,16 +36,16 @@ public class GlassesDevice {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void setAnimation(int i) {
-        byte[] speed = Enigma.getAnimCommand(i);
+        byte[] anim = Enigma.getAnimCommand(i);
         Log.d(C.TAG, "Setting animation to " + i);
-        raw.writeRawData(Enigma.getEncryptData(speed));
+        raw.writeRawData(Enigma.getEncryptData(anim));
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void setImage(int i) {
-        byte[] speed = Enigma.getImageCommand(i);
+        byte[] img = Enigma.getImageCommand(i);
         Log.d(C.TAG, "Setting image to " + i);
-        raw.writeRawData(Enigma.getEncryptData(speed));
+        raw.writeRawData(Enigma.getEncryptData(img));
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

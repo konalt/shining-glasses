@@ -28,7 +28,7 @@ android {
     }
 
     lintOptions {
-        disable 'SetTextI18n'
+        disable 'SetTextI18n','SmallTouchTarget'
     }
 }
 

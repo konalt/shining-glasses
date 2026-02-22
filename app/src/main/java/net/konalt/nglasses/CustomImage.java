@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class CustomImage {
-    public static final long IF_WAIT_TIME = 12;
+    public static final long IF_WAIT_TIME = 20;
     public static final long BLINK_WAIT_TIME = 15;
     private static final Handler handler = new Handler(Looper.getMainLooper());
     public static int currentColor = 0x0;
@@ -40,9 +40,10 @@ public class CustomImage {
         App.currentDevice.raw.writeRawDataC3(bArr);
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private static void sendPixelPacket(List<int[]> pixels, int startIndex, int color) {
+    private static void sendPixelPacket(List<int[]> pixels, int startIndex, int color, Runnable onFinishAll) {
         int remaining = pixels.size() - startIndex;
         if (remaining == 0) {
+            onFinishAll.run();
             finishSend();
             return;
         }
@@ -50,73 +51,137 @@ public class CustomImage {
         List<int[]> packet = pixels.subList(startIndex, startIndex + remaining);
         if (remaining == 8) {
             App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(() -> {
-                sendPixelPacket(pixels, startIndex + 8, color);
+                sendPixelPacket(pixels, startIndex + 8, color, onFinishAll);
             }, IF_WAIT_TIME));
         } else {
-            App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(CustomImage::finishSend, IF_WAIT_TIME));
+            App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(() -> {
+                onFinishAll.run();
+                finishSend();
+            }, IF_WAIT_TIME));
         }
         setPixels(packet, color);
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private static void sendBlinkPacket(List<Integer> pixels, int startIndex, int color, List<List<Integer>> lines, int lineIndex, boolean isClosing) {
+    private static void sendBlinkPacket(List<Integer> pixels, int startIndex, int color, List<List<Integer>> lines, int lineIndex, boolean isClosing, int minY, int maxY, Runnable onFinish) {
+        int remaining = pixels.size() - startIndex;
+        if (remaining <= 0) {
+            // Packet is empty, send the next line
+            Log.d(C.TAG, "Packet empty, sending next line");
+            int changeValue = isClosing ? 1 : -1;
+            sendBlinkLine(lines, lineIndex + changeValue, color, isClosing, minY, maxY, onFinish);
+            return;
+        }
+        if (remaining >= 9) remaining = 9;
+
+        Runnable onPixelsSet;
+        if (remaining == 9) {
+            // More pixels to set for this line, send another packet
+            onPixelsSet = () -> {
+                Log.d(C.BLINK_TAG, "Sending another packet");
+                sendBlinkPacket(pixels, startIndex + 8, color, lines, lineIndex, isClosing, minY, maxY, onFinish);
+            };
+        } else {
+            // After sending this, line will be done sending. We can send the next line
+            boolean isLastLine = isClosing ? (lineIndex == lines.size() - 1) : lineIndex == 0;
+            if (isLastLine) {
+                if (isClosing) {
+                    // Start opening again
+                    onPixelsSet = () -> {
+                        Log.d(C.BLINK_TAG, "Finished closing, now opening");
+                        sendBlinkLine(lines, lineIndex, color, false, minY, maxY, onFinish);
+                    };
+                } else {
+                    // Last line sent while opening, we can finish
+                    onPixelsSet = () -> {
+                        Log.d(C.BLINK_TAG, "Finished");
+                        onFinish.run();
+                    };
+                }
+            } else {
+                // There are lines remaining, send the next
+                // If we are closing, index must increment, otherwise decrement
+                int changeValue = isClosing ? 1 : -1;
+                onPixelsSet = () -> {
+                    Log.d(C.BLINK_TAG, "Sending next line");
+                    sendBlinkLine(lines, lineIndex + changeValue, color, isClosing, minY, maxY, onFinish);
+                };
+            }
+        }
+        App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(onPixelsSet, IF_WAIT_TIME));
+
+        if (remaining == 9) remaining = 8;
+        List<Integer> packet = pixels.subList(startIndex, startIndex + remaining);
+        List<int[]> packet2 = new ArrayList<>();
+        for (int px : packet) {
+            packet2.add(new int[]{px, lineIndex});
+        }
+
+        if (color == 1) {
+            setPixels(packet2, isClosing ? 0x0 : Rainbow.getVerticalColor(lineIndex,  minY, maxY));
+        } else {
+            setPixels(packet2, isClosing ? 0x0 : color);
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private static void sendBlinkLine(List<List<Integer>> lines, int index, int color, boolean isClosing, int minY, int maxY, Runnable onFinish) {
+        if (lines.size() <= index || index == -1) {
+            onFinish.run();
+            finishSend();
+            return;
+        }
+        sendBlinkPacket(lines.get(index), 0, color, lines, index, isClosing, minY, maxY, onFinish);
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private static void sendRainbowPacket(List<Integer> pixels, int startIndex, List<List<Integer>> lines, int lineIndex, Runnable onFinish, int minY, int maxY) {
         int remaining = pixels.size() - startIndex;
         if (remaining == 0) {
-            if (isClosing) {
-                sendBlinkLine(lines, lineIndex + 1, color, true);
-            } else {
-                if (lineIndex > 0) {
-                    sendBlinkLine(lines, lineIndex - 1, color, false);
-                }
-            }
+            sendRainbowLine(lines, lineIndex + 1, onFinish, minY, maxY);
             return;
         }
         if (remaining > 8) remaining = 8;
         List<Integer> packet = pixels.subList(startIndex, startIndex + remaining);
         if (remaining == 8) {
             App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(() -> {
-                sendBlinkPacket(pixels, startIndex + 8, color, lines, lineIndex, isClosing);
+                sendRainbowPacket(pixels, startIndex + 8, lines, lineIndex, onFinish, minY, maxY);
             }, IF_WAIT_TIME));
         } else {
-            if ((isClosing && lineIndex == lines.size() - 1) || (!isClosing && lineIndex == 0)) {
-                if (isClosing && color >= 0) {
-                    App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(() -> {
-                        sendBlinkLine(lines, lines.size() - 1, color, false);
-                    }, IF_WAIT_TIME));
-                } else {
-                    App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(CustomImage::finishSend, IF_WAIT_TIME));
-                }
+            if (lineIndex == lines.size() - 1) {
+                App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(() -> {
+                    onFinish.run();
+                    finishSend();
+                }, IF_WAIT_TIME));
             } else {
                 App.currentDevice.raw.onWriteCharacteristic3(() -> handler.postDelayed(() -> {
-                    if (isClosing) {
-                        sendBlinkLine(lines, lineIndex + 1, color, true);
-                    } else {
-                        sendBlinkLine(lines, lineIndex - 1, color, false);
-                    }
+                    sendRainbowLine(lines, lineIndex + 1, onFinish, minY, maxY);
                 }, BLINK_WAIT_TIME));
             }
         }
+
         List<int[]> packet2 = new ArrayList<>();
         for (int px : packet) {
             packet2.add(new int[]{px, lineIndex});
         }
-        if (color == -1) {
-            Log.d(C.TAG, "i: " + lineIndex);
-            setPixels(packet2, Rainbow.getVerticalColor(lineIndex));
-        } else {
-            setPixels(packet2, isClosing ? 0x0 : color);
-        }
+
+        setPixels(packet2, Rainbow.getVerticalColor(lineIndex, minY, maxY));
     }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private static void sendBlinkLine(List<List<Integer>> lines, int index, int color, boolean isClosing) {
-        if (lines.size() <= index) return;
-        sendBlinkPacket(lines.get(index), 0, color, lines, index, isClosing);
+    private static void sendRainbowLine(List<List<Integer>> lines, int index, Runnable onFinish, int minY, int maxY) {
+        if (lines.size() <= index) {
+            onFinish.run();
+            return;
+        }
+        sendRainbowPacket(lines.get(index), 0, lines, index, onFinish, minY, maxY);
     }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private static void finishSend() {
         Log.d(C.TAG, "Finished initializing");
-        App.currentDevice.raw.writeRawData(Enigma.getEncryptData(Enigma.getExitDiySave()));
+        //App.currentDevice.raw.writeRawData(Enigma.getEncryptData(Enigma.getExitDiySave()));
     }
-    private static List<int[]> parsePixelList(String data) {
+    public static List<int[]> parsePixelList(String data) {
         List<int[]> outPixels = new ArrayList<>();
         String[] onPixels = data.split(" ");
         for (String px : onPixels) {
@@ -165,80 +230,99 @@ public class CustomImage {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public static void init(String customImageData, int customImageColor, boolean clear) {
+    public static void init(String customImageData, int customImageColor, boolean clear, Runnable onFinish) {
         Log.d(C.TAG, "Loading custom image...");
         if (customImageColor != 0x0) currentColor = customImageColor;
         List<int[]> pixels = parsePixelList(customImageData);
         if (clear) {
             App.currentDevice.raw.onWriteCharacteristic1(() -> {
                 handler.postDelayed(() -> {
-                    sendPixelPacket(pixels, 0, customImageColor);
+                    sendPixelPacket(pixels, 0, customImageColor, onFinish);
                 }, IF_WAIT_TIME);
             });
             App.currentDevice.clear();
         } else {
-            sendPixelPacket(pixels, 0, customImageColor);
+            sendPixelPacket(pixels, 0, customImageColor, onFinish);
         }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private static void sendPaletteGroup(HashMap<Integer, List<int[]>> img, List<Integer> order, int index) {
+    private static void sendPaletteGroup(HashMap<Integer, List<int[]>> img, List<Integer> order, int index, Runnable onFinish) {
         int color = order.get(index);
         List<int[]> pixels = img.get(color);
         assert pixels != null;
         if (index < order.size() - 1) {
             App.currentDevice.raw.onWriteCharacteristic1(() -> {
                 handler.postDelayed(() -> {
-                    sendPaletteGroup(img, order, index + 1);
+                    sendPaletteGroup(img, order, index + 1, onFinish);
                 }, IF_WAIT_TIME);
             });
         }
-        sendPixelPacket(pixels, 0, color);
+        sendPixelPacket(pixels, 0, color, onFinish);
+    }
+
+    public static int[] getMinMaxY(List<int[]> pixels) {
+        int min = C.HEIGHT;
+        int max = 0;
+
+        for (int[] px : pixels) {
+            if (px[1] < min) min = px[1];
+            if (px[1] > max) max = px[1];
+        }
+
+        return new int[]{min, max};
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public static void initPaletteImage(String customImageData, boolean clear) {
+    public static void initPaletteImage(String customImageData, boolean clear, Runnable onFinish) {
         Log.d(C.TAG, "Loading custom image (palette)...");
         HashMap<Integer, List<int[]>> img = parsePaletteImage(customImageData);
         List<Integer> order = new ArrayList<>(img.keySet());
         if (clear) {
             App.currentDevice.raw.onWriteCharacteristic1(() -> {
                 handler.postDelayed(() -> {
-                    sendPaletteGroup(img, order, 0);
+                    sendPaletteGroup(img, order, 0, onFinish);
                 }, IF_WAIT_TIME);
             });
             App.currentDevice.clear();
         } else {
-            sendPaletteGroup(img, order, 0);
+            sendPaletteGroup(img, order, 0, onFinish);
         }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public static void initRainbow(String customImageData, boolean clear) {
+    public static void initRainbow(String customImageData, boolean clear, Runnable onFinish) {
         Log.d(C.TAG, "Loading custom image (rainbow)...");
         currentColor = -1;
         List<int[]> pixels = parsePixelList(customImageData);
         List<List<Integer>> lines = pixelListToLines(pixels);
+
+        int[] minmax = getMinMaxY(pixels);
+        int min = minmax[0];
+        int max = minmax[1];
+
         if (clear) {
             App.currentDevice.raw.onWriteCharacteristic1(() -> {
                 handler.postDelayed(() -> {
-                    sendBlinkLine(lines, 0, -1, true);
+                    sendRainbowLine(lines, 0, onFinish, min, max);
                 }, IF_WAIT_TIME);
             });
             App.currentDevice.clear();
         } else {
-            sendBlinkLine(lines, 0, -1, true);
+            sendRainbowLine(lines, 0, onFinish, min, max);
         }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public static void blink(String customImageData, int customImageColor) {
+    public static void blink(String customImageData, int customImageColor, Runnable onFinish) {
         Log.d(C.TAG, "Blinking custom image...");
         List<int[]> pixels = parsePixelList(customImageData);
         List<List<Integer>> lines = pixelListToLines(pixels);
 
-        Log.d(C.TAG, lines.toString());
+        int[] minmax = getMinMaxY(pixels);
+        int min = minmax[0];
+        int max = minmax[1];
 
-        sendBlinkLine(lines, 0, customImageColor, true);
+        sendBlinkLine(lines, 0, customImageColor, true, min, max, onFinish);
     }
 }
